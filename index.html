@@ -154,7 +154,7 @@
                     <textarea id="campaign-description" rows="3" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3" placeholder="Ví dụ: Đăng ký mua đồng phục năm học 2024-2025."></textarea>
                 </div>
                 <div class="border-t border-gray-200 pt-4">
-                    <h3 class="text-md font-bold text-gray-700 mb-2">Tùy chọn đăng ký</h3>
+                    <h3 class="text-md font-bold text-gray-700 mb-2">Tùy chọn đăng ký (bắt buộc)</h3>
                     <div id="options-list" class="space-y-4">
                         <!-- Dynamic options will be added here -->
                     </div>
@@ -540,7 +540,7 @@
             if (type === 'checkbox') {
                 htmlContent = `
                     <div class="flex items-center space-x-2">
-                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (ví dụ: Áo ngắn tay và quần)" value="${optionData.name}">
+                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (bắt buộc)" value="${optionData.name}" required>
                         <label class="flex items-center text-sm font-medium text-gray-700 whitespace-nowrap">
                             <input type="checkbox" class="needs-quantity rounded-full text-blue-600 mr-1" ${optionData.needsQuantity ? 'checked' : ''}> Số lượng
                         </label>
@@ -552,20 +552,20 @@
             } else if (type === 'dropdown') {
                 htmlContent = `
                     <div class="flex items-center space-x-2">
-                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (ví dụ: Cỡ áo)" value="${optionData.name}">
+                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (bắt buộc)" value="${optionData.name}" required>
                         <button type="button" class="remove-option-btn bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors">
                             <i class="ph ph-trash text-lg"></i>
                         </button>
                     </div>
                     <div>
                         <label class="block text-sm font-bold text-gray-700">Các lựa chọn (cách nhau bằng dấu phẩy)</label>
-                        <input type="text" class="option-dropdown-input mt-1" placeholder="Ví dụ: S, M, L, XL" value="${optionData.options || ''}">
+                        <input type="text" class="option-dropdown-input mt-1" placeholder="Ví dụ: S, M, L, XL (bắt buộc)" value="${optionData.options || ''}" required>
                     </div>
                 `;
             } else if (type === 'textbox') {
                 htmlContent = `
                     <div class="flex items-center space-x-2">
-                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (ví dụ: Họ tên Cha)" value="${optionData.name}">
+                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (bắt buộc)" value="${optionData.name}" required>
                         <button type="button" class="remove-option-btn bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors">
                             <i class="ph ph-trash text-lg"></i>
                         </button>
@@ -595,6 +595,45 @@
                 showMessage("Vui lòng nhập tiêu đề chiến dịch.");
                 return;
             }
+
+            // --- START VALIDATION ---
+            let isFormValid = true;
+            const optionDivs = optionsList.querySelectorAll('div.p-4');
+
+            if (optionDivs.length === 0) {
+                showMessage("Vui lòng thêm ít nhất một tùy chọn đăng ký.");
+                return;
+            }
+
+            for (const optionDiv of optionDivs) {
+                const nameInput = optionDiv.querySelector('.option-name');
+                if (nameInput && nameInput.value.trim() === '') {
+                    isFormValid = false;
+                    nameInput.focus();
+                    nameInput.classList.add('border-red-500');
+                    break;
+                } else {
+                     nameInput.classList.remove('border-red-500');
+                }
+                
+                if (optionDiv.dataset.type === 'dropdown') {
+                    const dropdownInput = optionDiv.querySelector('.option-dropdown-input');
+                    if (dropdownInput && dropdownInput.value.trim() === '') {
+                        isFormValid = false;
+                        dropdownInput.focus();
+                        dropdownInput.classList.add('border-red-500');
+                        break;
+                    } else {
+                        dropdownInput.classList.remove('border-red-500');
+                    }
+                }
+            }
+
+            if (!isFormValid) {
+                showMessage("Vui lòng điền đầy đủ thông tin cho tất cả các tùy chọn đã thêm.");
+                return; // Stop execution if validation fails
+            }
+            // --- END VALIDATION ---
             
             showLoading();
             
@@ -602,7 +641,7 @@
             optionsList.querySelectorAll('div.p-4').forEach(optionDiv => {
                 const type = optionDiv.dataset.type;
                 const name = optionDiv.querySelector('.option-name').value.trim();
-                if (!name) return;
+                // We already validated name is not empty, so no need for `if (!name) return;`
                 
                 if (type === 'checkbox') {
                     const needsQuantity = optionDiv.querySelector('.needs-quantity').checked;
@@ -614,12 +653,6 @@
                     options.push({ name, type: 'textbox' });
                 }
             });
-
-            if (options.length === 0) {
-                showMessage("Vui lòng thêm ít nhất một tùy chọn.");
-                hideLoading();
-                return;
-            }
             
             try {
                 const campaignsRef = collection(db, "artifacts", appId, "public", "data", "campaigns");
@@ -1196,7 +1229,7 @@
                      optionDiv.className = 'space-y-2';
                      optionDiv.innerHTML = `
                         <label for="option-${opt.name}" class="block text-sm font-bold text-gray-700">${opt.name}</label>
-                        <input type="text" id="option-${opt.name}" name="option-${opt.name}" class="option-input p-3 rounded-lg border-2 border-gray-400 w-full" placeholder="Nhập ${opt.name.toLowerCase()}">
+                        <input type="text" id="option-${opt.name}" name="option-${opt.name}" class="option-input p-3 rounded-lg border-2 border-gray-400 w-full" placeholder="Nhập ${opt.name.toLowerCase()}" required>
                      `;
                 }
                 dynamicOptionsContainer.appendChild(optionDiv);
@@ -1340,7 +1373,7 @@
             
         if (campaignId) {
             hideAllPanels();
-            mainTitle.textContent = "Form Đăng ký dành cho Trường PTTH Đỗ Mười";
+            mainTitle.textContent = "Form Đăng ký";
             loadStudentForm(campaignId);
         } else {
             hideAllPanels();
@@ -1350,5 +1383,4 @@
     </script>
 </body>
 </html>
-
 
