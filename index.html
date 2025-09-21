@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Quản lý Đăng ký Đa năng</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Inter -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <!-- SheetJS CDN for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Phosphor Icons for a clean look -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js CDN for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        .tab-button.active {
+            border-color: #3B82F6;
+            color: #2563EB;
+            font-weight: 600;
+        }
+        input:not([type="radio"]):not([type="checkbox"]), select, textarea {
+            transition: all 0.2s;
+            border-color: #d1d5db;
+        }
+        input:not([type="radio"]):not([type="checkbox"]):hover, select:hover, textarea:hover {
+            border-color: #9ca3af;
+        }
+        input:not([type="radio"]):not([type="checkbox"]):focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        .option-dropdown-input {
+            width: 100%;
+            height: 48px;
+            padding: 8px 12px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .option-dropdown-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        /* Custom styles for canvas to be responsive */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300 hidden">
+        <div class="flex flex-col items-center">
+            <svg class="animate-spin h-10 w-10 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-blue-600 font-medium">Đang tải...</span>
+        </div>
+    </div>
+
+    <!-- Message Box -->
+    <div id="message-box" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-40 transition-opacity duration-300 hidden">
+        <div class="bg-white rounded-xl p-6 shadow-2xl max-w-sm w-full">
+            <p id="message-text" class="text-center font-medium text-gray-800 mb-4"></p>
+            <div class="flex justify-center">
+                <button id="close-message" class="bg-blue-600 text-white rounded-full px-6 py-2 font-semibold shadow-md hover:bg-blue-700 transition-colors">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Link Modal -->
+    <div id="link-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-40 transition-opacity duration-300 hidden">
+        <div class="bg-white rounded-xl p-6 shadow-2xl max-w-lg w-full">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 text-center">Đường link đăng ký</h3>
+            <div class="flex items-center space-x-2">
+                <input type="text" id="modal-link-input" class="flex-1 p-3 rounded-lg bg-gray-100 border border-gray-300 text-sm" readonly>
+                <button id="modal-copy-btn" class="bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 transition-colors">
+                    <i class="ph ph-copy text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2 text-center">Sao chép và chia sẻ đường link này cho học sinh đăng ký.</p>
+            <div class="flex justify-center mt-4">
+                <button id="modal-close-btn" class="bg-red-500 text-white rounded-full px-6 py-2 font-semibold shadow-md hover:bg-red-600 transition-colors">Đóng</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-40 transition-opacity duration-300 hidden">
+        <div class="bg-white rounded-xl p-6 shadow-2xl max-w-md w-full">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 text-center">Kiểm tra lại thông tin đăng ký</h3>
+            <div id="confirmation-summary" class="space-y-2 text-sm text-gray-700 mb-6 border-t border-b border-gray-200 py-4">
+                <!-- Summary will be injected here -->
+            </div>
+            <div class="flex justify-center space-x-4">
+                <button id="change-details-btn" class="bg-gray-300 text-gray-800 rounded-full px-6 py-2 font-semibold shadow-md hover:bg-gray-400 transition-colors">Thay đổi</button>
+                <button id="confirm-submit-btn" class="bg-blue-600 text-white rounded-full px-6 py-2 font-semibold shadow-md hover:bg-blue-700 transition-colors">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="app-container" class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md sm:max-w-xl lg:max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-8 text-blue-600" id="main-title">Hệ thống Quản lý Đăng ký</h1>
+
+        <!-- Admin Login Panel -->
+        <div id="login-panel" class="hidden">
+            <h2 class="text-2xl font-bold text-center mb-4 text-gray-800">Đăng nhập Admin</h2>
+            <p class="text-sm text-center text-gray-600 mb-6">Sử dụng User ID của tài khoản quản trị viên.</p>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="admin-user-id" class="block text-sm font-bold text-gray-700">User ID</label>
+                    <input type="text" id="admin-user-id" required class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3" placeholder="Dán User ID của bạn vào đây">
+                </div>
+                <div>
+                    <button type="submit" class="w-full bg-blue-600 text-white rounded-full py-3 px-8 font-semibold shadow-md hover:bg-blue-700 transition-colors">Đăng nhập</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Admin Dashboard Panel -->
+        <div id="admin-panel" class="hidden">
+            <div class="flex mb-6">
+                <button id="tab-create" class="tab-button active flex-1 py-3 px-4 text-center text-sm transition-colors duration-200 focus:outline-none border-b-2 border-transparent">
+                    Tạo Link Đăng ký Mới
+                </button>
+                <button id="tab-view" class="tab-button flex-1 py-3 px-4 text-center text-sm transition-colors duration-200 focus:outline-none border-b-2 border-transparent">
+                    Xem Dữ liệu Đăng ký
+                </button>
+            </div>
+
+            <!-- Create New Form Section -->
+            <div id="create-form-section" class="space-y-6">
+                <h2 class="text-xl font-bold text-gray-800">Tạo Form Đăng ký Mới</h2>
+                <div>
+                    <label for="campaign-title" class="block text-sm font-bold text-gray-700">Tiêu đề Chiến dịch</label>
+                    <input type="text" id="campaign-title" required class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3">
+                </div>
+                <div>
+                    <label for="campaign-description" class="block text-sm font-bold text-gray-700">Mô tả (tùy chọn)</label>
+                    <textarea id="campaign-description" rows="3" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3" placeholder="Ví dụ: Đăng ký mua đồng phục năm học 2024-2025."></textarea>
+                </div>
+                <div class="border-t border-gray-200 pt-4">
+                    <h3 class="text-md font-bold text-gray-700 mb-2">Tùy chọn đăng ký</h3>
+                    <div id="options-list" class="space-y-4">
+                        <!-- Dynamic options will be added here -->
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <button type="button" id="add-checkbox-btn" class="flex items-center bg-gray-200 text-gray-700 rounded-full py-2 px-4 font-semibold hover:bg-gray-300 transition-colors">
+                            <i class="ph ph-check-square text-lg mr-2"></i>Checkbox
+                        </button>
+                        <button type="button" id="add-dropdown-btn" class="flex items-center bg-gray-200 text-gray-700 rounded-full py-2 px-4 font-semibold hover:bg-gray-300 transition-colors">
+                            <i class="ph ph-caret-down text-lg mr-2"></i>Dropdown
+                        </button>
+                        <button type="button" id="add-textbox-btn" class="flex items-center bg-gray-200 text-gray-700 rounded-full py-2 px-4 font-semibold hover:bg-gray-300 transition-colors">
+                            <i class="ph ph-text-box text-lg mr-2"></i>Text Box
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="require-notes" class="rounded-full text-blue-600 focus:ring-blue-500">
+                    <label for="require-notes" class="text-sm text-gray-700">Yêu cầu nhập ghi chú/địa chỉ (tùy chọn)</label>
+                </div>
+                <div>
+                    <button id="create-campaign-btn" class="w-full bg-green-600 text-white rounded-full py-3 px-8 font-semibold shadow-md hover:bg-green-700 transition-colors">Tạo Link</button>
+                </div>
+                <div id="generated-link-section" class="mt-6 p-4 bg-gray-100 rounded-xl hidden">
+                    <p class="text-sm text-gray-700 font-medium mb-2">Đường link đã tạo:</p>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="generated-link" class="flex-1 p-2 rounded-lg bg-white border border-gray-300 text-sm" readonly>
+                        <button id="copy-link-btn" class="bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 transition-colors">
+                            <i class="ph ph-copy text-lg"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Sao chép và chia sẻ đường link này cho học sinh đăng ký.</p>
+                </div>
+            </div>
+
+            <!-- View Existing Forms Section -->
+            <div id="view-forms-section" class="hidden">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Các Chiến dịch Đã Tạo</h2>
+                <div id="campaigns-list" class="space-y-4">
+                    <!-- Campaigns will be listed here -->
+                </div>
+            </div>
+
+            <!-- Specific Campaign Data View Section -->
+            <div id="campaign-data-section" class="hidden">
+                <div class="flex items-center mb-4 space-x-4">
+                    <button id="back-to-campaigns-btn" class="bg-gray-200 text-gray-700 rounded-full py-2 px-4 font-semibold hover:bg-gray-300 transition-colors">
+                        <i class="ph ph-arrow-left text-lg"></i>
+                    </button>
+                    <h2 id="campaign-data-title" class="text-xl font-bold text-gray-800"></h2>
+                    <button id="export-excel-btn" class="ml-auto bg-purple-600 text-white rounded-full py-2 px-4 font-semibold shadow-md hover:bg-purple-700 transition-colors">
+                        Xuất Excel
+                    </button>
+                </div>
+                
+                <!-- Main Stat Card -->
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-8 rounded-2xl shadow-lg mb-6 flex items-center justify-between transition-transform transform hover:scale-105">
+                    <div>
+                        <p class="text-lg uppercase font-semibold tracking-wider opacity-80">Tổng số lượt đăng ký</p>
+                        <p id="main-total-registrations" class="text-6xl font-bold tracking-tight">0</p>
+                    </div>
+                    <i class="ph ph-users-four text-8xl opacity-30"></i>
+                </div>
+
+
+                <!-- Filters Section -->
+                <div class="bg-gray-100 p-6 rounded-xl shadow-inner mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="ph ph-funnel text-xl mr-2"></i> Bộ lọc dữ liệu
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <div>
+                            <label for="filter-class" class="block text-sm font-bold text-gray-700">Lớp</label>
+                            <select id="filter-class" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3">
+                                <option value="">Tất cả</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filter-gender" class="block text-sm font-bold text-gray-700">Giới tính</label>
+                            <select id="filter-gender" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3">
+                                <option value="">Tất cả</option>
+                                <option value="Nam">Nam</option>
+                                <option value="Nữ">Nữ</option>
+                            </select>
+                        </div>
+                        <div id="filter-options-container" class="col-span-1 lg:col-span-2 xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Dynamic option filters will go here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics and Charts Section -->
+                <div id="statistics-section" class="bg-blue-50 p-6 rounded-xl shadow-inner mb-6">
+                    <h3 class="text-lg font-bold text-blue-800 mb-4 flex items-center">
+                        <i class="ph ph-chart-bar text-xl mr-2"></i> Thống kê Chi tiết
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <p class="text-sm text-gray-500 mb-2">Giới tính</p>
+                            <div class="chart-container">
+                                <canvas id="gender-chart"></canvas>
+                            </div>
+                        </div>
+                        <div id="class-chart-container" class="bg-white p-4 rounded-lg shadow-sm">
+                            <p class="text-sm text-gray-500 mb-2">Theo lớp</p>
+                            <div class="chart-container">
+                                <canvas id="class-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dynamic Option Charts -->
+                    <div id="option-charts-container" class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Dynamic charts will be populated here -->
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl shadow-md">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr id="data-table-headers">
+                                <!-- Headers will be generated dynamically -->
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Registration Form Panel -->
+        <div id="student-form-panel" class="hidden p-4">
+            <h2 id="student-form-title" class="text-2xl font-bold text-center mb-2 text-blue-600"></h2>
+            <p id="student-form-description" class="text-sm text-center text-gray-600 mb-6"></p>
+
+            <form id="student-registration-form" class="space-y-6">
+                <div>
+                    <label for="student-name" class="block text-sm font-bold text-gray-700">Họ và Tên</label>
+                    <input type="text" id="student-name" required class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700">Ngày sinh</label>
+                    <div class="mt-1 flex space-x-2">
+                        <select id="dob-day" required class="w-1/3 rounded-lg border-2 border-gray-400 p-3">
+                            <option value="">Ngày</option>
+                        </select>
+                        <select id="dob-month" required class="w-1/3 rounded-lg border-2 border-gray-400 p-3">
+                            <option value="">Tháng</option>
+                        </select>
+                        <select id="dob-year" required class="w-1/3 rounded-lg border-2 border-gray-400 p-3">
+                            <option value="">Năm</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700">Giới tính</label>
+                    <div class="mt-2 flex space-x-6">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="gender" value="Nam" required class="form-radio h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700">Nam</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="gender" value="Nữ" required class="form-radio h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700">Nữ</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label for="student-class" class="block text-sm font-bold text-gray-700">Lớp</label>
+                    <select id="student-class" required class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3">
+                        <option value="">Chọn lớp</option>
+                    </select>
+                </div>
+                
+                <div id="dynamic-options-container" class="space-y-6">
+                    <!-- Dynamic options will be rendered here -->
+                </div>
+                
+                <div id="notes-section" class="space-y-2 hidden">
+                    <label for="notes" class="block text-sm font-bold text-gray-700">Ghi chú (tùy chọn)</label>
+                    <textarea id="notes" rows="3" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3" placeholder="Thêm ghi chú của bạn nếu cần."></textarea>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" id="student-submit-btn" class="w-full bg-blue-600 text-white rounded-full py-3 px-8 font-semibold shadow-md hover:bg-blue-700 transition-colors">Gửi Đăng ký</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, addDoc, serverTimestamp, query, where, orderBy } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+        // Global Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAtjEr4TbDsLHdycc8bHhlTN3Ovw4zYM5g",
+            authDomain: "a2-b43d6.firebaseapp.com",
+            projectId: "a2-b43d6",
+            storageBucket: "a2-b43d6.firebasestorage.app",
+            messagingSenderId: "19454507527",
+            appId: "1:19454507527:web:94684e3d57015c202408a2"
+        };
+        const appId = "a2-b43d6"; // Hardcode appId based on your config
+        // Dán User ID của bạn vào đây để cấp quyền quản trị.
+        // Bạn có thể tìm thấy ID này trong Firebase Console -> Authentication.
+        const adminUserId = "cyWIU5DcVgfRnwzreuhbytsF54q1"; // Dán ID của bạn vào giữa cặp dấu nháy kép này
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+    
+        // Global variables
+        let uid = null;
+        let isAdmin = false;
+        let currentCampaignId = null;
+        let allRegistrations = [];
+        let currentCampaign = null;
+        let charts = {};
+        let pendingRegistrationData = null; // Store data before confirmation
+        
+        // DOM Elements
+        const mainTitle = document.getElementById('main-title');
+        const appContainer = document.getElementById('app-container');
+        const loading = document.getElementById('loading');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const closeMessageBtn = document.getElementById('close-message');
+        
+        // Panels
+        const loginPanel = document.getElementById('login-panel');
+        const loginForm = document.getElementById('login-form');
+        const adminUserIdInput = document.getElementById('admin-user-id');
+        const adminPanel = document.getElementById('admin-panel');
+        const studentFormPanel = document.getElementById('student-form-panel');
+
+        // Link Modal elements
+        const linkModal = document.getElementById('link-modal');
+        const modalLinkInput = document.getElementById('modal-link-input');
+        const modalCopyBtn = document.getElementById('modal-copy-btn');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        
+        // Confirmation Modal elements
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const confirmationSummary = document.getElementById('confirmation-summary');
+        const confirmSubmitBtn = document.getElementById('confirm-submit-btn');
+        const changeDetailsBtn = document.getElementById('change-details-btn');
+        
+        // Admin Elements
+        const tabCreate = document.getElementById('tab-create');
+        const tabView = document.getElementById('tab-view');
+        const createFormSection = document.getElementById('create-form-section');
+        const viewFormsSection = document.getElementById('view-forms-section');
+        const campaignTitleInput = document.getElementById('campaign-title');
+        const campaignDescriptionInput = document.getElementById('campaign-description');
+        const optionsList = document.getElementById('options-list');
+        const addCheckboxBtn = document.getElementById('add-checkbox-btn');
+        const addDropdownBtn = document.getElementById('add-dropdown-btn');
+        const addTextboxBtn = document.getElementById('add-textbox-btn');
+        const requireNotesCheckbox = document.getElementById('require-notes');
+        const createCampaignBtn = document.getElementById('create-campaign-btn');
+        const generatedLinkSection = document.getElementById('generated-link-section');
+        const generatedLinkInput = document.getElementById('generated-link');
+        const copyLinkBtn = document.getElementById('copy-link-btn');
+        const campaignsList = document.getElementById('campaigns-list');
+        const campaignDataSection = document.getElementById('campaign-data-section');
+        const backToCampaignsBtn = document.getElementById('back-to-campaigns-btn');
+        const campaignDataTitle = document.getElementById('campaign-data-title');
+        const dataTableHeaders = document.getElementById('data-table-headers');
+        const dataTableBody = document.getElementById('data-table-body');
+        const exportExcelBtn = document.getElementById('export-excel-btn');
+        const mainTotalRegistrationsEl = document.getElementById('main-total-registrations');
+        const filterClassSelect = document.getElementById('filter-class');
+        const filterGenderSelect = document.getElementById('filter-gender');
+        const filterOptionsContainer = document.getElementById('filter-options-container');
+        const statisticsSection = document.getElementById('statistics-section');
+        const optionChartsContainer = document.getElementById('option-charts-container');
+        
+        // Student Form Elements
+        const studentFormTitle = document.getElementById('student-form-title');
+        const studentFormDescription = document.getElementById('student-form-description');
+        const studentRegistrationForm = document.getElementById('student-registration-form');
+        const studentNameInput = document.getElementById('student-name');
+        const dobDaySelect = document.getElementById('dob-day');
+        const dobMonthSelect = document.getElementById('dob-month');
+        const dobYearSelect = document.getElementById('dob-year');
+        const studentClassSelect = document.getElementById('student-class');
+        const dynamicOptionsContainer = document.getElementById('dynamic-options-container');
+        const notesSection = document.getElementById('notes-section');
+        const notesInput = document.getElementById('notes');
+        
+        // Utility Functions
+        function showMessage(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+        function hideMessage() { messageBox.classList.add('hidden'); }
+        closeMessageBtn.addEventListener('click', hideMessage);
+        
+        function showLoading() { loading.classList.remove('hidden'); }
+        function hideLoading() { loading.classList.add('hidden'); }
+        
+        function hideAllPanels() {
+            loginPanel.classList.add('hidden');
+            adminPanel.classList.add('hidden');
+            studentFormPanel.classList.add('hidden');
+        }
+        
+        function populateDOB() {
+            const currentYear = new Date().getFullYear();
+            for (let i = 1; i <= 31; i++) {
+                const option = document.createElement('option');
+                option.value = i.toString().padStart(2, '0');
+                option.textContent = i.toString().padStart(2, '0');
+                dobDaySelect.appendChild(option);
+            }
+            for (let i = 1; i <= 12; i++) {
+                const option = document.createElement('option');
+                option.value = i.toString().padStart(2, '0');
+                option.textContent = i.toString().padStart(2, '0');
+                dobMonthSelect.appendChild(option);
+            }
+            for (let i = currentYear; i >= 2005; i--) {
+                const option = document.createElement('option');
+                option.value = i.toString();
+                option.textContent = i.toString();
+                dobYearSelect.appendChild(option);
+            }
+        }
+        populateDOB();
+
+        // Populate class options
+        const classes = ['10A1', '10A2', '10A3', '10A4', '10A5', '10A6', '10A7', '10D1', '10D2', '10D3'];
+        classes.forEach(cls => {
+            const option = document.createElement('option');
+            option.value = cls;
+            option.textContent = cls;
+            studentClassSelect.appendChild(option);
+            
+            const filterOption = document.createElement('option');
+            filterOption.value = cls;
+            filterOption.textContent = cls;
+            filterClassSelect.appendChild(filterOption);
+        });
+        
+        // Function to destroy all existing charts
+        function destroyAllCharts() {
+            for (const chartId in charts) {
+                if (charts[chartId]) {
+                    charts[chartId].destroy();
+                    charts[chartId] = null;
+                }
+            }
+        }
+
+        // Function to render a chart
+        function renderChart(id, type, data, options) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            if (charts[id]) {
+                charts[id].destroy();
+            }
+            charts[id] = new Chart(canvas, {
+                type: type,
+                data: data,
+                options: options
+            });
+        }
+
+        // ===================================
+        // ADMIN DASHBOARD LOGIC
+        // ===================================
+        
+        // Add option row to admin form
+        function addOptionRow(type, optionData = { name: '', needsQuantity: false, options: '' }) {
+            const newOptionDiv = document.createElement('div');
+            newOptionDiv.className = 'p-4 border border-gray-300 rounded-xl space-y-2';
+            let htmlContent = '';
+            
+            if (type === 'checkbox') {
+                htmlContent = `
+                    <div class="flex items-center space-x-2">
+                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (ví dụ: Áo ngắn tay và quần)" value="${optionData.name}">
+                        <label class="flex items-center text-sm font-medium text-gray-700 whitespace-nowrap">
+                            <input type="checkbox" class="needs-quantity rounded-full text-blue-600 mr-1" ${optionData.needsQuantity ? 'checked' : ''}> Số lượng
+                        </label>
+                        <button type="button" class="remove-option-btn bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors">
+                            <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                `;
+            } else if (type === 'dropdown') {
+                htmlContent = `
+                    <div class="flex items-center space-x-2">
+                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (ví dụ: Cỡ áo)" value="${optionData.name}">
+                        <button type="button" class="remove-option-btn bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors">
+                            <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700">Các lựa chọn (cách nhau bằng dấu phẩy)</label>
+                        <input type="text" class="option-dropdown-input mt-1" placeholder="Ví dụ: S, M, L, XL" value="${optionData.options || ''}">
+                    </div>
+                `;
+            } else if (type === 'textbox') {
+                htmlContent = `
+                    <div class="flex items-center space-x-2">
+                        <input type="text" class="option-name flex-1 p-2 rounded-lg border-2 border-gray-400" placeholder="Tên tùy chọn (ví dụ: Họ tên Cha)" value="${optionData.name}">
+                        <button type="button" class="remove-option-btn bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors">
+                            <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                `;
+            }
+            newOptionDiv.innerHTML = htmlContent;
+            newOptionDiv.dataset.type = type;
+            optionsList.appendChild(newOptionDiv);
+        }
+        addCheckboxBtn.addEventListener('click', () => addOptionRow('checkbox'));
+        addDropdownBtn.addEventListener('click', () => addOptionRow('dropdown'));
+        addTextboxBtn.addEventListener('click', () => addOptionRow('textbox'));
+        
+        // Remove option row
+        optionsList.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-option-btn')) {
+                e.target.closest('div.p-4').remove();
+            }
+        });
+        
+        // Create campaign and generate link
+        createCampaignBtn.addEventListener('click', async () => {
+            const title = campaignTitleInput.value.trim();
+            const description = campaignDescriptionInput.value.trim();
+            if (!title) {
+                showMessage("Vui lòng nhập tiêu đề chiến dịch.");
+                return;
+            }
+            
+            showLoading();
+            
+            const options = [];
+            optionsList.querySelectorAll('div.p-4').forEach(optionDiv => {
+                const type = optionDiv.dataset.type;
+                const name = optionDiv.querySelector('.option-name').value.trim();
+                if (!name) return;
+                
+                if (type === 'checkbox') {
+                    const needsQuantity = optionDiv.querySelector('.needs-quantity').checked;
+                    options.push({ name, needsQuantity, type: 'checkbox' });
+                } else if (type === 'dropdown') {
+                    const dropdownOptions = optionDiv.querySelector('.option-dropdown-input').value.split(',').map(s => s.trim()).filter(s => s);
+                    options.push({ name, options: dropdownOptions, type: 'dropdown' });
+                } else if (type === 'textbox') {
+                    options.push({ name, type: 'textbox' });
+                }
+            });
+
+            if (options.length === 0) {
+                showMessage("Vui lòng thêm ít nhất một tùy chọn.");
+                hideLoading();
+                return;
+            }
+            
+            try {
+                const campaignsRef = collection(db, "artifacts", appId, "public", "data", "campaigns");
+                const newCampaignDoc = await addDoc(campaignsRef, {
+                    title: title,
+                    description: description,
+                    options: options,
+                    requireNotes: requireNotesCheckbox.checked,
+                    createdAt: serverTimestamp(),
+                });
+                
+                const campaignId = newCampaignDoc.id;
+                const publicCollectionPath = `artifacts/${appId}/public/data/registrations/${campaignId}/registrations_data`;
+                await setDoc(newCampaignDoc, { publicCollectionPath, id: campaignId }, { merge: true });
+                
+                const generatedLink = `${window.location.origin}${window.location.pathname}?campaignId=${campaignId}`;
+                generatedLinkInput.value = generatedLink;
+                generatedLinkSection.classList.remove('hidden');
+                
+                showMessage("Đã tạo chiến dịch thành công!");
+                
+            } catch (error) {
+                showMessage("Lỗi khi tạo chiến dịch: " + error.message);
+                console.error("Lỗi khi tạo chiến dịch:", error);
+            } finally {
+                hideLoading();
+            }
+        });
+        
+        // Copy link to clipboard
+        copyLinkBtn.addEventListener('click', () => {
+            generatedLinkInput.select();
+            document.execCommand('copy');
+            showMessage("Đã sao chép đường link!");
+        });
+        
+        // Switch between create and view tabs
+        tabCreate.addEventListener('click', () => {
+            tabCreate.classList.add('active');
+            tabView.classList.remove('active');
+            createFormSection.classList.remove('hidden');
+            viewFormsSection.classList.add('hidden');
+            campaignDataSection.classList.add('hidden');
+            destroyAllCharts();
+        });
+        
+        tabView.addEventListener('click', () => {
+            tabView.classList.add('active');
+            tabCreate.classList.remove('active');
+            createFormSection.classList.add('hidden');
+            campaignDataSection.classList.add('hidden');
+            viewFormsSection.classList.remove('hidden');
+            listenForCampaigns();
+        });
+
+        // Listen for existing campaigns
+        function listenForCampaigns() {
+            const campaignsRef = collection(db, "artifacts", appId, "public", "data", "campaigns");
+            const q = query(campaignsRef, orderBy('createdAt', 'desc'));
+
+            onSnapshot(q, (snapshot) => {
+                campaignsList.innerHTML = '';
+                if (snapshot.empty) {
+                    campaignsList.innerHTML = `<p class="text-center text-gray-500">Chưa có chiến dịch nào được tạo.</p>`;
+                }
+                snapshot.forEach(doc => {
+                    const campaign = doc.data();
+                    const campaignDiv = document.createElement('div');
+                    campaignDiv.className = 'bg-gray-100 p-4 rounded-xl flex items-center justify-between shadow-sm';
+                    campaignDiv.innerHTML = `
+                        <div>
+                            <button class="font-semibold text-gray-800 hover:text-blue-600 transition-colors campaign-link-btn" data-id="${doc.id}">
+                                ${campaign.title}
+                            </button>
+                            <p class="text-xs text-gray-500">Tạo lúc: ${new Date(campaign.createdAt.toDate()).toLocaleString()}</p>
+                        </div>
+                        <button class="view-data-btn bg-blue-600 text-white rounded-full py-2 px-4 font-semibold hover:bg-blue-700 transition-colors text-sm" data-id="${doc.id}">
+                            Xem dữ liệu
+                        </button>
+                    `;
+                    campaignsList.appendChild(campaignDiv);
+                });
+            }, (error) => {
+                showMessage("Lỗi khi lấy danh sách chiến dịch: " + error.message);
+            });
+        }
+        
+        // Handle view data button click
+        campaignsList.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('view-data-btn')) {
+                const campaignId = e.target.dataset.id;
+                showCampaignData(campaignId);
+            } else if (e.target.classList.contains('campaign-link-btn')) {
+                const campaignId = e.target.dataset.id;
+                const link = `${window.location.origin}${window.location.pathname}?campaignId=${campaignId}`;
+                showLinkModal(link);
+            }
+        });
+
+        // Link Modal functions
+        function showLinkModal(link) {
+            modalLinkInput.value = link;
+            linkModal.classList.remove('hidden');
+        }
+
+        modalCloseBtn.addEventListener('click', () => {
+            linkModal.classList.add('hidden');
+        });
+
+        modalCopyBtn.addEventListener('click', () => {
+            modalLinkInput.select();
+            document.execCommand('copy');
+            showMessage("Đã sao chép đường link!");
+        });
+
+        backToCampaignsBtn.addEventListener('click', () => {
+            campaignDataSection.classList.add('hidden');
+            viewFormsSection.classList.remove('hidden');
+            destroyAllCharts();
+        });
+
+        async function showCampaignData(campaignId) {
+            showLoading();
+            const campaignDocRef = doc(db, "artifacts", appId, "public", "data", "campaigns", campaignId);
+            const campaignDoc = await getDoc(campaignDocRef);
+            if (!campaignDoc.exists()) {
+                showMessage("Không tìm thấy chiến dịch này.");
+                hideLoading();
+                return;
+            }
+            const campaign = campaignDoc.data();
+            currentCampaignId = campaign.id;
+            currentCampaign = campaign;
+            destroyAllCharts();
+
+            campaignDataTitle.textContent = campaign.title;
+            viewFormsSection.classList.add('hidden');
+            campaignDataSection.classList.remove('hidden');
+            
+            const registrationCollectionRef = collection(db, campaign.publicCollectionPath);
+            onSnapshot(registrationCollectionRef, (snapshot) => {
+                allRegistrations = [];
+                snapshot.forEach(doc => {
+                    allRegistrations.push(doc.data());
+                });
+
+                filterOptionsContainer.innerHTML = '';
+                campaign.options.forEach(opt => {
+                    const filterDiv = document.createElement('div');
+                    const filterId = `filter-option-${opt.name.replace(/\s/g, '-')}`;
+                    if (opt.type === 'checkbox') {
+                        filterDiv.innerHTML = `
+                            <label for="${filterId}" class="block text-sm font-bold text-gray-700">${opt.name}</label>
+                            <select id="${filterId}" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3 filter-option-select">
+                                <option value="">Tất cả</option>
+                                <option value="true">Có</option>
+                                <option value="false">Không</option>
+                            </select>
+                        `;
+                    } else if (opt.type === 'dropdown') {
+                        let optionsHtml = opt.options.map(o => `<option value="${o}">${o}</option>`).join('');
+                        filterDiv.innerHTML = `
+                            <label for="${filterId}" class="block text-sm font-bold text-gray-700">${opt.name}</label>
+                            <select id="${filterId}" class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3 filter-option-select">
+                                <option value="">Tất cả</option>
+                                ${optionsHtml}
+                            </select>
+                        `;
+                    } else if (opt.type === 'textbox') {
+                         filterDiv.innerHTML = `
+                            <label for="${filterId}" class="block text-sm font-bold text-gray-700">${opt.name}</label>
+                            <input type="text" id="${filterId}" placeholder="Tìm kiếm..." class="mt-1 block w-full rounded-lg border-2 border-gray-400 p-3 filter-option-input">
+                        `;
+                    }
+                    
+                    filterOptionsContainer.appendChild(filterDiv);
+                });
+                
+                renderFilteredData();
+
+                hideLoading();
+            }, (error) => {
+                showMessage("Lỗi khi lấy dữ liệu đăng ký: " + error.message);
+                hideLoading();
+            });
+        }
+        
+        function renderFilteredData() {
+            const selectedClass = filterClassSelect.value;
+            const selectedGender = filterGenderSelect.value;
+            const selectedOptions = {};
+            document.querySelectorAll('.filter-option-select').forEach(select => {
+                const optionName = select.id.replace('filter-option-', '').replace(/-/g, ' ');
+                selectedOptions[optionName] = select.value;
+            });
+            const textFilters = {};
+             document.querySelectorAll('.filter-option-input').forEach(input => {
+                const optionName = input.id.replace('filter-option-', '').replace(/-/g, ' ');
+                textFilters[optionName] = input.value.trim().toLowerCase();
+            });
+
+            const filteredData = allRegistrations.filter(reg => {
+                let matches = true;
+                if (selectedClass && reg.class !== selectedClass) {
+                    matches = false;
+                }
+                if (selectedGender && reg.gender !== selectedGender) {
+                    matches = false;
+                }
+                for (const optionName in selectedOptions) {
+                    const selectedValue = selectedOptions[optionName];
+                    if (selectedValue === '') continue;
+
+                    const regValue = reg.options[optionName];
+                    const optionConfig = currentCampaign.options.find(o => o.name === optionName);
+
+                    if (optionConfig.type === 'checkbox') {
+                         if (selectedValue === 'true' && !regValue) {
+                            matches = false;
+                        }
+                        if (selectedValue === 'false' && regValue) {
+                            matches = false;
+                        }
+                    } else if (optionConfig.type === 'dropdown') {
+                        if (regValue !== selectedValue) {
+                            matches = false;
+                        }
+                    }
+                }
+                
+                for (const optionName in textFilters) {
+                    const filterValue = textFilters[optionName];
+                    if (filterValue === '') continue;
+                    const regValue = reg.options[optionName]?.toLowerCase();
+                    if (!regValue || !regValue.includes(filterValue)) {
+                        matches = false;
+                    }
+                }
+                return matches;
+            });
+            
+            // Render statistics
+            const stats = {
+                total: filteredData.length,
+                gender: { 'Nam': 0, 'Nữ': 0 },
+                classes: {},
+                options: {}
+            };
+            if (currentCampaign) {
+                currentCampaign.options.forEach(opt => {
+                    if (opt.type === 'checkbox') {
+                        stats.options[opt.name] = { 'Có': 0, 'Không': 0 };
+                    } else if (opt.type === 'dropdown') {
+                        stats.options[opt.name] = {};
+                        opt.options.forEach(o => stats.options[opt.name][o] = 0);
+                    }
+                });
+            }
+
+            filteredData.forEach(reg => {
+                if (reg.gender) stats.gender[reg.gender]++;
+                if (reg.class) stats.classes[reg.class] = (stats.classes[reg.class] || 0) + 1;
+                for (const optName in reg.options) {
+                    const optionConfig = currentCampaign.options.find(o => o.name === optName);
+                    if (optionConfig) {
+                        if (optionConfig.type === 'checkbox') {
+                            if (reg.options[optName]) {
+                                stats.options[optName]['Có']++;
+                            } else {
+                                stats.options[optName]['Không']++;
+                            }
+                        } else if (optionConfig.type === 'dropdown' && reg.options[optName] in stats.options[optName]) {
+                            stats.options[optName][reg.options[optName]]++;
+                        }
+                    }
+                }
+            });
+            
+            mainTotalRegistrationsEl.textContent = stats.total;
+
+            // Render Charts
+            // Gender Chart
+            renderChart('gender-chart', 'pie', {
+                labels: ['Nam', 'Nữ'],
+                datasets: [{
+                    data: [stats.gender['Nam'], stats.gender['Nữ']],
+                    backgroundColor: ['#3B82F6', '#EC4899'],
+                    hoverOffset: 4
+                }]
+            }, {
+                responsive: true,
+                maintainAspectRatio: false
+            });
+
+            // Class Chart
+            renderChart('class-chart', 'bar', {
+                labels: Object.keys(stats.classes),
+                datasets: [{
+                    label: 'Số lượng đăng ký',
+                    data: Object.values(stats.classes),
+                    backgroundColor: '#8B5CF6',
+                    borderColor: '#7C3AED',
+                    borderWidth: 1
+                }]
+            }, {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            });
+
+            // Dynamic Option Charts
+            optionChartsContainer.innerHTML = '';
+            for (const optName in stats.options) {
+                const statDiv = document.createElement('div');
+                statDiv.className = 'bg-white p-4 rounded-lg shadow-sm';
+                statDiv.innerHTML = `
+                    <p class="text-sm text-gray-500 mb-2">${optName}</p>
+                    <div class="chart-container">
+                        <canvas id="chart-${optName.replace(/\s/g, '-')}" class="w-full h-full"></canvas>
+                    </div>
+                `;
+                optionChartsContainer.appendChild(statDiv);
+
+                const optionConfig = currentCampaign.options.find(o => o.name === optName);
+                if (optionConfig && optionConfig.type === 'checkbox') {
+                    renderChart(`chart-${optName.replace(/\s/g, '-')}`, 'pie', {
+                        labels: ['Có', 'Không'],
+                        datasets: [{
+                            data: [stats.options[optName]['Có'], stats.options[optName]['Không']],
+                            backgroundColor: ['#22C55E', '#EF4444'],
+                            hoverOffset: 4
+                        }]
+                    }, {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    });
+                } else if (optionConfig && optionConfig.type === 'dropdown') {
+                    renderChart(`chart-${optName.replace(/\s/g, '-')}`, 'bar', {
+                        labels: Object.keys(stats.options[optName]),
+                        datasets: [{
+                            label: 'Số lượng',
+                            data: Object.values(stats.options[optName]),
+                            backgroundColor: '#F59E0B',
+                            borderColor: '#D97706',
+                            borderWidth: 1
+                        }]
+                    }, {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    });
+                }
+            }
+            
+            // Render table data
+            dataTableHeaders.innerHTML = '';
+            dataTableBody.innerHTML = '';
+            let headers = ['STT', 'Họ và Tên', 'Ngày sinh', 'Giới tính', 'Lớp'];
+            if (currentCampaign) {
+                currentCampaign.options.forEach(opt => headers.push(opt.name));
+            }
+            if (currentCampaign.requireNotes) headers.push('Ghi chú');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.className = 'px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider';
+                th.textContent = header;
+                dataTableHeaders.appendChild(th);
+            });
+            
+            filteredData.forEach((registration, index) => {
+                const row = document.createElement('tr');
+                let cells = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${index + 1}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${registration.fullName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${registration.dob}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${registration.gender}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${registration.class}</td>
+                `;
+                if (currentCampaign) {
+                    currentCampaign.options.forEach(opt => {
+                        const value = registration.options[opt.name];
+                        if (opt.type === 'checkbox') {
+                            if (opt.needsQuantity) {
+                                cells += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${value || '0'}</td>`;
+                            } else {
+                                cells += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${value ? 'Có' : 'Không'}</td>`;
+                            }
+                        } else if (opt.type === 'dropdown') {
+                            cells += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${value || ''}</td>`;
+                        } else if (opt.type === 'textbox') {
+                             cells += `<td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap truncate max-w-sm" title="${value || ''}">${value || ''}</td>`;
+                        }
+                    });
+                }
+                if (currentCampaign.requireNotes) {
+                    cells += `<td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap truncate max-w-sm" title="${registration.notes || ''}">${registration.notes || ''}</td>`;
+                }
+                row.innerHTML = cells;
+                dataTableBody.appendChild(row);
+            });
+        }
+        
+        // Add event listeners for filters
+        filterClassSelect.addEventListener('change', () => renderFilteredData());
+        filterGenderSelect.addEventListener('change', () => renderFilteredData());
+        filterOptionsContainer.addEventListener('change', (e) => {
+            if (e.target.classList.contains('filter-option-select')) {
+                renderFilteredData();
+            }
+        });
+        filterOptionsContainer.addEventListener('input', (e) => {
+            if (e.target.classList.contains('filter-option-input')) {
+                renderFilteredData();
+            }
+        });
+
+        // Helper function to get campaign data
+        let campaignCache = {};
+        async function getCampaignData(campaignId) {
+            if (campaignCache[campaignId]) return campaignCache[campaignId];
+            const campaignDocRef = doc(db, "artifacts", appId, "public", "data", "campaigns", campaignId);
+            const campaignDoc = await getDoc(campaignDocRef);
+            if (campaignDoc.exists()) {
+                campaignCache[campaignId] = campaignDoc.data();
+                return campaignCache[campaignId];
+            }
+            return null;
+        }
+
+        // Export data to Excel
+        exportExcelBtn.addEventListener('click', async () => {
+            const selectedClass = filterClassSelect.value;
+            const selectedGender = filterGenderSelect.value;
+            const selectedOptions = {};
+            document.querySelectorAll('.filter-option-select').forEach(select => {
+                const optionName = select.id.replace('filter-option-', '').replace(/-/g, ' ');
+                selectedOptions[optionName] = select.value;
+            });
+             const textFilters = {};
+             document.querySelectorAll('.filter-option-input').forEach(input => {
+                const optionName = input.id.replace('filter-option-', '').replace(/-/g, ' ');
+                textFilters[optionName] = input.value.trim().toLowerCase();
+            });
+
+            const filteredData = allRegistrations.filter(reg => {
+                let matches = true;
+                if (selectedClass && reg.class !== selectedClass) {
+                    matches = false;
+                }
+                if (selectedGender && reg.gender !== selectedGender) {
+                    matches = false;
+                }
+                for (const optionName in selectedOptions) {
+                    const selectedValue = selectedOptions[optionName];
+                    if (selectedValue === '') continue;
+
+                    const regValue = reg.options[optionName];
+                    const optionConfig = currentCampaign.options.find(o => o.name === optionName);
+
+                    if (optionConfig.type === 'checkbox') {
+                         if (selectedValue === 'true' && !regValue) {
+                            matches = false;
+                        }
+                        if (selectedValue === 'false' && regValue) {
+                            matches = false;
+                        }
+                    } else if (optionConfig.type === 'dropdown') {
+                        if (regValue !== selectedValue) {
+                            matches = false;
+                        }
+                    }
+                }
+                
+                for (const optionName in textFilters) {
+                    const filterValue = textFilters[optionName];
+                    if (filterValue === '') continue;
+                    const regValue = reg.options[optionName]?.toLowerCase();
+                    if (!regValue || !regValue.includes(filterValue)) {
+                        matches = false;
+                    }
+                }
+                return matches;
+            });
+            
+            if (filteredData.length === 0) {
+                showMessage("Không có dữ liệu để xuất.");
+                return;
+            }
+
+            const campaign = await getCampaignData(currentCampaignId);
+            const dataToExport = filteredData.map(d => {
+                const flatData = {
+                    "Họ và Tên": d.fullName,
+                    "Ngày sinh": d.dob,
+                    "Giới tính": d.gender,
+                    "Lớp": d.class,
+                };
+                if (campaign) {
+                    campaign.options.forEach(opt => {
+                       if (d.options[opt.name] !== undefined) {
+                           flatData[opt.name] = d.options[opt.name];
+                       }
+                    });
+                }
+                if (d.notes) {
+                    flatData["Ghi chú"] = d.notes;
+                }
+                return flatData;
+            });
+
+            const workSheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workBook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workBook, workSheet, "Dữ liệu đăng ký");
+            XLSX.writeFile(workBook, `dang_ky_${currentCampaignId}.xlsx`);
+            
+            showMessage("Đã xuất file Excel thành công!");
+        });
+
+        // ===================================
+        // STUDENT FORM LOGIC
+        // ===================================
+
+        async function loadStudentForm(campaignId) {
+            showLoading();
+            const campaignDocRef = doc(db, "artifacts", appId, "public", "data", "campaigns", campaignId);
+            const campaignDoc = await getDoc(campaignDocRef);
+            
+            if (!campaignDoc.exists()) {
+                showMessage("Không tìm thấy form đăng ký. Vui lòng kiểm tra lại đường link.");
+                hideLoading();
+                return;
+            }
+
+            const campaignData = campaignDoc.data();
+            currentCampaign = campaignData; // Save current campaign data
+            currentCampaignId = campaignId;
+            
+            studentFormTitle.textContent = campaignData.title;
+            studentFormDescription.textContent = campaignData.description;
+
+            // Dynamically create options
+            dynamicOptionsContainer.innerHTML = '';
+            campaignData.options.forEach(opt => {
+                const optionDiv = document.createElement('div');
+                if (opt.type === 'checkbox') {
+                    if (opt.needsQuantity) {
+                        optionDiv.className = 'flex items-center space-x-2';
+                        optionDiv.innerHTML = `
+                            <label for="option-${opt.name}" class="text-sm font-bold text-gray-700 w-full">${opt.name}</label>
+                            <input type="number" id="option-${opt.name}" name="option-${opt.name}" class="option-input p-2 rounded-lg border-2 border-gray-400 w-16" min="0" value="0">
+                        `;
+                    } else {
+                        optionDiv.className = 'flex items-center space-x-2';
+                        optionDiv.innerHTML = `
+                            <input type="checkbox" id="option-${opt.name}" name="option-${opt.name}" class="option-checkbox rounded-full text-blue-600">
+                            <label for="option-${opt.name}" class="text-sm font-bold text-gray-700">${opt.name}</label>
+                        `;
+                    }
+                } else if (opt.type === 'dropdown') {
+                    const dropdownOptionsHtml = opt.options.map(o => `<option value="${o}">${o}</option>`).join('');
+                     optionDiv.className = 'space-y-2';
+                     optionDiv.innerHTML = `
+                        <label for="option-${opt.name}" class="block text-sm font-bold text-gray-700">${opt.name}</label>
+                        <select id="option-${opt.name}" name="option-${opt.name}" class="option-select p-3 rounded-lg border-2 border-gray-400 w-full" required>
+                            <option value="">Chọn một tùy chọn</option>
+                            ${dropdownOptionsHtml}
+                        </select>
+                     `;
+                } else if (opt.type === 'textbox') {
+                     optionDiv.className = 'space-y-2';
+                     optionDiv.innerHTML = `
+                        <label for="option-${opt.name}" class="block text-sm font-bold text-gray-700">${opt.name}</label>
+                        <input type="text" id="option-${opt.name}" name="option-${opt.name}" class="option-input p-3 rounded-lg border-2 border-gray-400 w-full" placeholder="Nhập ${opt.name.toLowerCase()}">
+                     `;
+                }
+                dynamicOptionsContainer.appendChild(optionDiv);
+            });
+            
+            if (campaignData.requireNotes) {
+                notesSection.classList.remove('hidden');
+            } else {
+                notesSection.classList.add('hidden');
+            }
+
+            hideLoading();
+            studentFormPanel.classList.remove('hidden');
+        }
+        
+        // Handle student form review
+        studentRegistrationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const dob = `${dobDaySelect.value}/${dobMonthSelect.value}/${dobYearSelect.value}`;
+            const selectedGender = document.querySelector('input[name="gender"]:checked')?.value;
+            
+            const optionsData = {};
+            const optionInputs = document.querySelectorAll('#dynamic-options-container .option-input');
+            optionInputs.forEach(input => {
+                const name = input.id.replace('option-', '');
+                optionsData[name] = input.type === 'number' ? parseInt(input.value) || 0 : input.value.trim();
+            });
+            
+            const optionCheckboxes = document.querySelectorAll('#dynamic-options-container .option-checkbox');
+            optionCheckboxes.forEach(checkbox => {
+                const name = checkbox.id.replace('option-', '');
+                optionsData[name] = checkbox.checked;
+            });
+            
+            const optionSelects = document.querySelectorAll('#dynamic-options-container .option-select');
+            optionSelects.forEach(select => {
+                const name = select.id.replace('option-', '');
+                optionsData[name] = select.value;
+            });
+            
+            // Store data in a temporary variable for submission after confirmation
+            pendingRegistrationData = {
+                fullName: studentNameInput.value.trim(),
+                dob: dob,
+                gender: selectedGender,
+                class: studentClassSelect.value,
+                options: optionsData,
+                notes: notesInput.value.trim(),
+                submittedAt: serverTimestamp(),
+            };
+            
+            // Build the summary HTML
+            let summaryHtml = `
+                <p><strong>Họ và Tên:</strong> ${pendingRegistrationData.fullName}</p>
+                <p><strong>Ngày sinh:</strong> ${pendingRegistrationData.dob}</p>
+                <p><strong>Giới tính:</strong> ${pendingRegistrationData.gender}</p>
+                <p><strong>Lớp:</strong> ${pendingRegistrationData.class}</p>
+            `;
+            
+            if (currentCampaign) {
+                currentCampaign.options.forEach(opt => {
+                    const value = pendingRegistrationData.options[opt.name];
+                    let displayValue = '';
+                    if (opt.type === 'checkbox') {
+                        if (opt.needsQuantity) {
+                            displayValue = value > 0 ? `${value}` : "Không";
+                        } else {
+                            displayValue = value ? 'Có' : 'Không';
+                        }
+                    } else {
+                        displayValue = value || 'Chưa chọn';
+                    }
+                    summaryHtml += `<p><strong>${opt.name}:</strong> ${displayValue}</p>`;
+                });
+            }
+
+            if (currentCampaign.requireNotes && pendingRegistrationData.notes) {
+                summaryHtml += `<p><strong>Ghi chú:</strong> ${pendingRegistrationData.notes}</p>`;
+            }
+
+            confirmationSummary.innerHTML = summaryHtml;
+            confirmationModal.classList.remove('hidden');
+        });
+        
+        // Handle clicking the "Change" button in the confirmation modal
+        changeDetailsBtn.addEventListener('click', () => {
+            confirmationModal.classList.add('hidden');
+            pendingRegistrationData = null; // Clear pending data
+        });
+
+        // Handle clicking the "Confirm" button in the confirmation modal
+        confirmSubmitBtn.addEventListener('click', async () => {
+            confirmationModal.classList.add('hidden');
+            if (!pendingRegistrationData) {
+                showMessage("Đã có lỗi xảy ra. Vui lòng thử lại.");
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const campaignDocRef = doc(db, "artifacts", appId, "public", "data", "campaigns", currentCampaignId);
+                const campaignDoc = await getDoc(campaignDocRef);
+                const collectionPath = campaignDoc.data().publicCollectionPath;
+
+                await addDoc(collection(db, collectionPath), pendingRegistrationData);
+                
+                showMessage("Đăng ký của bạn đã được gửi thành công. Cảm ơn bạn!");
+                studentRegistrationForm.reset();
+                
+            } catch (error) {
+                showMessage("Lỗi khi gửi đăng ký: " + error.message);
+                console.error("Lỗi khi gửi đăng ký:", error);
+            } finally {
+                hideLoading();
+                pendingRegistrationData = null; // Clear data after submission
+            }
+        });
+
+
+        // ===================================
+        // INITIALIZATION AND ROUTING
+        // ===================================
+        
+        // Handle login form submission
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const inputUserId = adminUserIdInput.value.trim();
+            if (inputUserId === adminUserId) {
+                loginPanel.classList.add('hidden');
+                adminPanel.classList.remove('hidden');
+                tabCreate.click();
+            } else {
+                showMessage("User ID không hợp lệ. Vui lòng thử lại.");
+            }
+        });
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const campaignId = urlParams.get('campaignId');
+            
+        if (campaignId) {
+            hideAllPanels();
+            mainTitle.textContent = "Form Đăng ký";
+            loadStudentForm(campaignId);
+        } else {
+            hideAllPanels();
+            loginPanel.classList.remove('hidden');
+        }
+        
+    </script>
+</body>
+</html>
+
+
